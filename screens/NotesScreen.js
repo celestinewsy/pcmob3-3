@@ -7,12 +7,38 @@ import {
  TouchableOpacity,
 } from "react-native";
 import { Entypo } from "@expo/vector-icons";
+import * as SQLite from "expo-sqlite";
+
+const db = SQLite.openDatabase("notes.db");
 
 export default function NotesScreen({ navigation, route }) {
- const [notes, setNotes] = useState([
-   { title: "Walk the cat", done: false, id: "0" },
-   { title: "Feed the elephant", done: false, id: "1" },
- ]);
+ const [notes, setNotes] = useState([]);
+
+ function refreshNotes() {
+   db.transaction((tx) => {
+     tx.executeSql(
+       "SELECT * FROM notes",
+       null,
+       (txObj, { rows: { _array } }) => setNotes(_array),
+       (txObj, error) => console.log("Error ", error)
+     );
+   });
+ }
+
+ useEffect(() => {
+   db.transaction((tx) => {
+     tx.executeSql(
+       `CREATE TABLE IF NOT EXISTS
+       notes
+       (id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT,
+        done INT);`
+     );
+   },
+   null,
+   refreshNotes
+   );
+ }, []),
 
  useEffect(() => {
    navigation.setOptions({
@@ -31,12 +57,15 @@ export default function NotesScreen({ navigation, route }) {
 
  useEffect(() => {
   if (route.params?.text) {
-    const newNote = {
-      title: route.params.text,
-      done: false,
-      id: notes.length.toString(),
-    };
-    setNotes([...notes, newNote]);
+    db.transaction(
+      (tx) => {
+        tx.executeSql("INSERT INTO notes (done, title) VALUES (0, ?)", [
+          route.params.text,
+        ]);
+      },
+      null,
+      refreshNotes
+    );
   }
 }, [route.params?.text]);
 
